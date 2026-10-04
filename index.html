@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tostador de café</title>
+<style>
+:root{--bg:#dde4cf;--ink:#2a1d14;--soft:#5b5a47;--card:#eef1e4;--line:#b9c2a3;--accent:#7a4a26}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,sans-serif}
+main{max-width:820px;margin:0 auto;padding:16px 14px 40px}
+header{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px}
+h1{font:700 1.7rem Georgia,serif;margin:0}
+.meta{color:var(--soft);font-size:.9rem}
+#st{margin:14px 0;padding:16px;border-radius:14px;color:#fff;font-weight:700;font-size:1.25rem;text-align:center;background:#888;transition:background .3s}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.grid .card{margin:0}
+.card h3{margin:0 0 4px;font-size:.8rem;color:var(--soft);font-weight:700;letter-spacing:.05em}
+.big{font:700 2.3rem Georgia,serif}
+.tag{display:inline-block;padding:2px 10px;border-radius:99px;font-size:.8rem;font-weight:700;color:#fff;background:#888}
+.bar{position:relative;height:12px;background:#cfd6bd;border-radius:6px;margin:10px 0 4px}
+.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:6px;background:var(--accent);width:0}
+.bar b{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink)}
+.ctl{display:flex;gap:8px;flex-wrap:wrap}
+button{font:600 1rem system-ui,sans-serif;border:0;border-radius:10px;padding:12px 16px;cursor:pointer;background:var(--ink);color:#f1e9dc;flex:1}
+button.sel{background:var(--accent)}
+button:disabled{opacity:.4;cursor:not-allowed}
+#go{flex:1 1 100%;margin-bottom:4px}
+canvas{width:100%;height:auto;background:#fff8;border-radius:10px}
+.leg{font-size:.85rem;color:var(--soft)}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+td,th{padding:6px 4px;border-bottom:1px solid var(--line);text-align:left}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>Tostador de café</h1>
+  <div class="meta"><span id="hora">--</span> · <span id="con">Conectando…</span></div>
+</header>
+
+<div id="st">Conectando…</div>
+
+<div class="grid">
+  <div class="card"><h3>CAFÉ</h3><div class="big" id="tc">--</div><span class="tag" id="ac">--</span></div>
+  <div class="card"><h3>TAMBOR</h3><div class="big" id="tt">--</div><span class="tag" id="at">--</span></div>
+  <div class="card"><h3>MOTOR DEL TAMBOR</h3><div class="big" id="mo">--</div></div>
+  <div class="card"><h3>CALEFACTOR</h3><div class="big" id="ca">--</div></div>
+  <div class="card"><h3>VENTILADOR</h3><div class="big" id="fa">--</div></div>
+</div>
+
+<div class="card">
+  <h3>TIEMPO DE TUESTE <span id="nm"></span></h3>
+  <div class="big" id="el">00:00</div>
+  <div class="bar"><i id="pb"></i><b id="m1"></b><b id="m2"></b></div>
+  <div class="meta" id="rg"></div>
+</div>
+
+<div class="card">
+  <h3>CONTROL</h3>
+  <div class="ctl">
+    <button id="go">Iniciar tueste y motor</button>
+    <button data-n="0">Claro</button>
+    <button data-n="1">Medio</button>
+    <button data-n="2">Oscuro</button>
+    <button id="fb" style="flex:1 1 100%">Probar ventilador</button>
+  </div>
+  <div class="meta" style="margin-top:8px">El tipo de tueste solo se cambia con el tueste detenido.</div>
+</div>
+
+<div class="card">
+  <h3>TEMPERATURA EN VIVO</h3>
+  <canvas id="cv" width="720" height="240"></canvas>
+  <div class="leg"><span style="color:#7a4a26">■ Café</span> &nbsp; <span style="color:#2a6f97">■ Tambor</span> &nbsp; <span style="color:#5a8c3c">■ Rango del perfil</span></div>
+</div>
+
+<div class="card">
+  <h3>REFERENCIA DE PERFILES</h3>
+  <table>
+    <tr><th>Tueste</th><th>Temp.</th><th>Tiempo</th><th>Humedad final</th></tr>
+    <tr><td>Claro</td><td>180–197 °C</td><td>7–11 min</td><td>2.5–2.8 %</td></tr>
+    <tr><td>Medio</td><td>210–220 °C</td><td>7–13 min</td><td>1.8–1.9 %</td></tr>
+    <tr><td>Oscuro</td><td>230–250 °C</td><td>12–15 min</td><td>1.2–1.3 %</td></tr>
+  </table>
+  <div class="meta" style="margin-top:6px">La humedad es solo informativa: el sistema no la mide, controla temperatura y tiempo.</div>
+</div>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const C={r:'#c53030',g:'#2f855a',y:'#b7791f',b:'#2b6cb0',m:'#97266d'};
+const AL=['En rango','Calentando','Temp. baja','Temp. alta','Desconectada'];
+const AC=[C.g,C.y,C.r,C.r,C.r];
+const MAX=600, hist={c:[],t:[]};
+let last=null, prevFase=0;
+
+const mmss=s=>String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+
+function sens(d,s,idT,idA){
+  const t=$(idT),a=$(idA);
+  if(!s.hay){t.textContent='--';a.textContent='Sin datos';a.style.background='#888';return}
+  if(!s.ok){t.textContent='--';a.textContent='Desconectada';a.style.background=C.r;return}
+  t.textContent=s.temp.toFixed(1)+' °C';
+  const espera=d.fase==0&&s.alerta==0;
+  a.textContent=espera?'En espera':AL[s.alerta];
+  a.style.background=espera?C.b:AC[s.alerta];
+}
+
+function push(a,s){
+  if(s.hay&&s.ok){a.push(s.temp);if(a.length>MAX)a.shift()}
+}
+
+function render(d){
+  last=d;
+  if(d.fase!=0&&prevFase==0){hist.c=[];hist.t=[]}
+  prevFase=d.fase;
+  $('hora').textContent=d.hora;
+  sens(d,d.cafe,'tc','ac');
+  sens(d,d.tambor,'tt','at');
+  $('mo').textContent=d.motor?'GIRANDO':'PARADO';
+  $('fa').textContent=['APAGADO','REGULANDO','ENFRIANDO'][d.fan];
+  $('ca').textContent=d.calor?'ENCENDIDO':'APAGADO';
+  $('nm').textContent='· '+d.nombre;
+  $('el').textContent=mmss(d.elapsed);
+  const esc=d.t_max_s*1.15;
+  $('pb').style.width=Math.min(100,d.elapsed/esc*100)+'%';
+  $('m1').style.left=(d.t_min_s/esc*100)+'%';
+  $('m2').style.left=(d.t_max_s/esc*100)+'%';
+  $('rg').textContent='Rango '+d.tmin+'–'+d.tmax+' °C · tiempo '+(d.t_min_s/60)+'–'+(d.t_max_s/60)+' min';
+
+  const ss=[d.cafe,d.tambor];
+  const alerta=ss.some(s=>s.hay&&(!s.ok||s.alerta>=2));
+  const cal=ss.some(s=>s.hay&&s.ok&&s.alerta==1);
+  let m,c;
+  if(d.fase==3)      [m,c]=['¡TIEMPO MÁXIMO EXCEDIDO!',C.r];
+  else if(alerta)    [m,c]=['ALERTA: temperatura fuera de rango o sensor desconectado',C.r];
+  else if(d.fase==4) [m,c]=['Enfriando · ventilador y motor encendidos',C.b];
+  else if(d.fase==0) [m,c]=['En espera',C.b];
+  else if(d.fase==2) [m,c]=['Listo para descargar',C.m];
+  else if(cal)       [m,c]=['Calentando',C.y];
+  else               [m,c]=['En rango · todo bien',C.g];
+  $('st').textContent=m;$('st').style.background=c;
+
+  $('go').textContent=d.fase==0?'▶ Iniciar tueste y motor':(d.fase==4?'■ Cancelar enfriamiento':'■ Terminar tueste y enfriar');
+  document.querySelectorAll('[data-n]').forEach(b=>{
+    b.classList.toggle('sel',+b.dataset.n==d.tueste);
+    b.disabled=d.fase!=0;
+  });
+  push(hist.c,d.cafe);push(hist.t,d.tambor);
+  draw();
+}
+
+function draw(){
+  const cv=$('cv'),x=cv.getContext('2d'),W=cv.width,H=cv.height;
+  x.clearRect(0,0,W,H);
+  const Y=v=>H-10-(v-20)/240*(H-20);
+  if(last){x.fillStyle='rgba(90,140,60,.2)';x.fillRect(0,Y(last.tmax),W,Y(last.tmin)-Y(last.tmax))}
+  x.fillStyle='#5b5a47';x.font='12px system-ui';
+  [50,100,150,200,250].forEach(v=>{
+    x.strokeStyle='#0002';x.beginPath();x.moveTo(0,Y(v));x.lineTo(W,Y(v));x.stroke();
+    x.fillText(v+'°',4,Y(v)-3);
+  });
+  const line=(a,col)=>{
+    if(a.length<2)return;
+    x.strokeStyle=col;x.lineWidth=2.5;x.beginPath();
+    a.forEach((v,i)=>{const px=i/(MAX-1)*W;i?x.lineTo(px,Y(v)):x.moveTo(px,Y(v))});
+    x.stroke();
+  };
+  line(hist.c,'#7a4a26');line(hist.t,'#2a6f97');
+}
+
+async function poll(){
+  try{
+    const r=await fetch('/api/estado',{cache:'no-store'});
+    render(await r.json());
+    $('con').textContent='● Conectado';$('con').style.color=C.g;
+  }catch(e){
+    $('con').textContent='● Sin conexión';$('con').style.color=C.r;
+  }
+  setTimeout(poll,1000);
+}
+
+async function post(u){try{await fetch(u,{method:'POST'})}catch(e){}}
+$('go').onclick=()=>post('/api/start');
+$('fb').onclick=()=>post('/api/fan');
+document.querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>post('/api/tueste?n='+b.dataset.n));
+poll();
+</script>
+</body>
+</html>

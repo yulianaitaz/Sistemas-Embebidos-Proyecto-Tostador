@@ -1,0 +1,15 @@
+menu "Configuracion WiFi Tostador"
+
+    config TOSTADOR_WIFI_SSID
+        string "Nombre de la red WiFi (SSID)"
+        default "MiTelefono"
+        help
+            Nombre del hotspot del celular al que se conectara el ESP32.
+
+    config TOSTADOR_WIFI_PASSWORD
+        string "Clave de la red WiFi"
+        default "mi_clave_wifi"
+        help
+            Clave del hotspot (minimo 8 caracteres).
+
+endmenu
